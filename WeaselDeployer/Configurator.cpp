@@ -5,20 +5,20 @@
 #include "UIStyleSettings.h"
 #include "UIStyleSettingsDialog.h"
 #include "DictManagementDialog.h"
-#include <WeaselCommon.h>
+#include <WeaselConstants.h>
 #include <WeaselIPC.h>
+#include <WeaselIPCData.h>
 #include <WeaselUtility.h>
-#include <WeaselVersion.h>
 #pragma warning(disable : 4005)
 #include <rime_api.h>
 #include <rime_levers_api.h>
 #pragma warning(default : 4005)
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <fstream>
 #include "WeaselDeployer.h"
 
 static void CreateFileIfNotExist(std::string filename) {
-  boost::filesystem::path file_path =
+  std::filesystem::path file_path =
       WeaselUserDataPath() / string_to_wstring(filename, CP_UTF8);
   DWORD dwAttrib = GetFileAttributes(file_path.c_str());
   if (!(INVALID_FILE_ATTRIBUTES != dwAttrib &&

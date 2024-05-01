@@ -17,7 +17,6 @@ jobs:
   build:
     runs-on: windows-2019
     env:
-      librime_build: 'submodule'
       boost_version: 1.84.0
       BOOST_ROOT: ${{ github.workspace }}\deps\boost_1_84_0
     steps:
@@ -25,8 +24,15 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
+      - name: Cache llvm
+        id: cache-llvm
+        uses: actions/cache@v4
+        with:
+          path: C:\\Program Files\\LLVM
+          key: ${{ runner.os }}-llvm-17.0.6
 
       - name: Install llvm
+        if: steps.cache-llvm.outputs.cache-hit != 'true'
         run: choco install llvm --version=17.0.6
 
       - name: Code style lint

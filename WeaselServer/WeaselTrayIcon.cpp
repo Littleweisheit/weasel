@@ -1,5 +1,6 @@
 ﻿#include "stdafx.h"
 #include "WeaselTrayIcon.h"
+#include <WeaselConstants.h>
 
 // nasty
 #include <resource.h>
@@ -29,6 +30,8 @@ BOOL WeaselTrayIcon::Create(HWND hTargetWnd) {
   }
   if (!m_style.display_tray_icon) {
     RemoveIcon();
+  } else {
+    AddIcon();
   }
   return bRet;
 }

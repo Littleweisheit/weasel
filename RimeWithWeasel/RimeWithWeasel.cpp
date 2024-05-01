@@ -2,10 +2,10 @@
 #include <logging.h>
 #include <RimeWithWeasel.h>
 #include <StringAlgorithm.hpp>
+#include <WeaselConstants.h>
 #include <WeaselUtility.h>
-#include <WeaselVersion.h>
 
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <map>
 #include <regex>
 #include <rime_api.h>
@@ -585,8 +585,8 @@ std::wstring _LoadIconSettingFromSchema(
     RimeConfig& config,
     const char* key1,
     const char* key2,
-    const boost::filesystem::path& user_dir,
-    const boost::filesystem::path& shared_dir) {
+    const std::filesystem::path& user_dir,
+    const std::filesystem::path& shared_dir) {
   const int BUF_SIZE = 255;
   char buffer[BUF_SIZE + 1] = {0};
   if (RimeConfigGetString(&config, key1, buffer, BUF_SIZE) ||
@@ -1128,6 +1128,7 @@ void RimeWithWeaselHandler::_UpdateShowNotifications(RimeConfig* config,
     }
     if (initialize)
       m_show_notifications_base = m_show_notifications;
+    RimeConfigEnd(&iter);
   } else {
     // not configured, or incorrect type
     if (initialize)
@@ -1161,8 +1162,6 @@ static void _UpdateUIStyle(RimeConfig* config, UI* ui, bool initialize) {
                           &style.label_font_point, "style/font_point", _abs);
   _RimeGetIntWithFallback(config, "style/comment_font_point",
                           &style.comment_font_point, "style/font_point", _abs);
-  _RimeGetIntWithFallback(config, "style/mouse_hover_ms", &style.mouse_hover_ms,
-                          NULL, _abs);
   _RimeGetIntWithFallback(config, "style/candidate_abbreviate_length",
                           &style.candidate_abbreviate_length, NULL, _abs);
   _RimeGetBool(config, "style/inline_preedit", initialize, style.inline_preedit,
@@ -1185,6 +1184,12 @@ static void _UpdateUIStyle(RimeConfig* config, UI* ui, bool initialize) {
   _RimeParseStringOptWithFallback(config, "style/antialias_mode",
                                   style.antialias_mode, _aliasModeMap,
                                   style.antialias_mode);
+  const std::map<std::string, UIStyle::HoverType> _hoverTypeMap = {
+      {std::string("none"), UIStyle::HoverType::NONE},
+      {std::string("semi_hilite"), UIStyle::HoverType::SEMI_HILITE},
+      {std::string("hilite"), UIStyle::HoverType::HILITE}};
+  _RimeParseStringOptWithFallback(config, "style/hover_type", style.hover_type,
+                                  _hoverTypeMap, style.hover_type);
   const std::map<std::string, UIStyle::LayoutAlignType> _alignType = {
       {std::string("top"), UIStyle::ALIGN_TOP},
       {std::string("center"), UIStyle::ALIGN_CENTER},
@@ -1223,6 +1228,10 @@ static void _UpdateUIStyle(RimeConfig* config, UI* ui, bool initialize) {
     style.layout_type = UIStyle::LAYOUT_VERTICAL_TEXT;
   _RimeGetStringWithFunc(config, "style/label_format", style.label_text_format);
   _RimeGetStringWithFunc(config, "style/mark_text", style.mark_text);
+  _RimeGetIntWithFallback(config, "style/layout/baseline", &style.baseline,
+                          NULL, _abs);
+  _RimeGetIntWithFallback(config, "style/layout/linespacing",
+                          &style.linespacing, NULL, _abs);
   _RimeGetIntWithFallback(config, "style/layout/min_width", &style.min_width,
                           NULL, _abs);
   _RimeGetIntWithFallback(config, "style/layout/max_width", &style.max_width,

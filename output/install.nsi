@@ -11,7 +11,7 @@ Unicode true
 ; General
 
 !ifndef WEASEL_VERSION
-!define WEASEL_VERSION 1.0.0
+!define WEASEL_VERSION 0.1.0
 !endif
 
 !ifndef WEASEL_BUILD
@@ -144,6 +144,8 @@ Section "Weasel"
   SectionIn RO
 
   ; Write the new installation path into the registry
+  ; redirect on 64 bit system
+  ; HKLM SOFTWARE\WOW6432Node\Rime\Weasel "InstallDir" "$INSTDIR"
   WriteRegStr HKLM SOFTWARE\Rime\Weasel "InstallDir" "$INSTDIR"
 
   ; Reset INSTDIR for the new version
@@ -182,14 +184,6 @@ program_files:
     File /nonfatal "weaselARM.dll"
     File /nonfatal "weaselARM64.dll"
     File /nonfatal "weaselARM64X.dll"
-  ${EndIf}
-  File "weaselt.dll"
-  ${If} ${RunningX64}
-    File "weaseltx64.dll"
-  ${EndIf}
-  ${If} ${IsNativeARM64}
-    File /nonfatal "weaseltARM.dll"
-    File /nonfatal "weaseltARM64.dll"
   ${EndIf}
   File "weasel.ime"
   ${If} ${RunningX64}
@@ -290,6 +284,12 @@ program_files:
   deploy_done:
   ; ...
 
+  ; don't redirect on 64 bit system for auto run setting
+  ${If} ${IsNativeARM64}
+    SetRegView 64
+  ${ElseIf} ${IsNativeAMD64}
+    SetRegView 64
+  ${Endif}
   ; Write autorun key
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Run" "WeaselServer" "$INSTDIR\WeaselServer.exe"
   ; Start WeaselServer
@@ -330,9 +330,15 @@ Section "Uninstall"
   ExecWait '"$INSTDIR\WeaselSetup.exe" /u'
 
   ; Remove registry keys
-  DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Weasel"
-  DeleteRegValue HKLM "Software\Microsoft\Windows\CurrentVersion\Run" "WeaselServer"
   DeleteRegKey HKLM SOFTWARE\Rime
+  DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Weasel"
+  ; don't redirect on 64 bit system for auto run setting
+  ${If} ${IsNativeARM64}
+    SetRegView 64
+  ${ElseIf} ${IsNativeAMD64}
+    SetRegView 64
+  ${Endif}
+  DeleteRegValue HKLM "Software\Microsoft\Windows\CurrentVersion\Run" "WeaselServer"
 
   ; Remove files and uninstaller
   SetOutPath $TEMP

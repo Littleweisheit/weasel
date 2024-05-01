@@ -1,5 +1,5 @@
 #pragma once
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <string>
 
 inline int utf8towcslen(const char* utf8_str, int utf8_len) {
@@ -27,8 +27,8 @@ inline std::wstring getUsername() {
 }
 
 // data directories
-boost::filesystem::path WeaselSharedDataPath();
-boost::filesystem::path WeaselUserDataPath();
+std::filesystem::path WeaselSharedDataPath();
+std::filesystem::path WeaselUserDataPath();
 
 inline BOOL IsUserDarkMode() {
   constexpr const LPCWSTR key =
@@ -82,6 +82,17 @@ inline std::string wstring_to_string(const std::wstring& wstr,
   res.append(buffer);
   delete[] buffer;
   return res;
+}
+
+inline BOOL is_wow64() {
+  DWORD errorCode;
+  if (GetSystemWow64DirectoryW(NULL, 0) == 0)
+    if ((errorCode = GetLastError()) == ERROR_CALL_NOT_IMPLEMENTED)
+      return FALSE;
+    else
+      ExitProcess((UINT)errorCode);
+  else
+    return TRUE;
 }
 
 template <typename CharT>

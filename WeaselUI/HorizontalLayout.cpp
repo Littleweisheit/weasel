@@ -11,25 +11,34 @@ void HorizontalLayout::DoLayout(CDCHandle dc, PDWR pDWR) {
   /* calc mark_text sizes */
   if ((_style.hilited_mark_color & 0xff000000)) {
     CSize sg;
-    if (_style.mark_text.empty())
-      GetTextSizeDW(L"|", 1, pDWR->pTextFormat, pDWR, &sg);
-    else
-      GetTextSizeDW(_style.mark_text, _style.mark_text.length(),
-                    pDWR->pTextFormat, pDWR, &sg);
+    if (candidates_count) {
+      if (_style.mark_text.empty())
+        GetTextSizeDW(L"|", 1, pDWR->pTextFormat, pDWR, &sg);
+      else
+        GetTextSizeDW(_style.mark_text, _style.mark_text.length(),
+                      pDWR->pTextFormat, pDWR, &sg);
+    }
 
-    MARK_WIDTH = sg.cx;
-    MARK_HEIGHT = sg.cy;
-    if (_style.mark_text.empty())
-      MARK_WIDTH /= 2;
-    MARK_GAP = (_style.mark_text.empty()) ? MARK_WIDTH
-                                          : MARK_WIDTH + _style.hilite_spacing;
+    mark_width = sg.cx;
+    mark_height = sg.cy;
+    if (_style.mark_text.empty()) {
+      mark_width = mark_height / 7;
+      if (_style.linespacing && _style.baseline)
+        mark_width =
+            (int)((float)mark_width / ((float)_style.linespacing / 100.0f));
+      mark_width = max(mark_width, 6);
+    }
+    mark_gap = (_style.mark_text.empty()) ? mark_width
+                                          : mark_width + _style.hilite_spacing;
   }
-  int base_offset = ((_style.hilited_mark_color & 0xff000000)) ? MARK_GAP : 0;
+  int base_offset = ((_style.hilited_mark_color & 0xff000000)) ? mark_gap : 0;
 
   // calc page indicator
   CSize pgszl, pgszr;
-  GetTextSizeDW(pre, pre.length(), pDWR->pPreeditTextFormat, pDWR, &pgszl);
-  GetTextSizeDW(next, next.length(), pDWR->pPreeditTextFormat, pDWR, &pgszr);
+  if (!IsInlinePreedit()) {
+    GetTextSizeDW(pre, pre.length(), pDWR->pPreeditTextFormat, pDWR, &pgszl);
+    GetTextSizeDW(next, next.length(), pDWR->pPreeditTextFormat, pDWR, &pgszr);
+  }
   bool page_en = (_style.prevpage_color & 0xff000000) &&
                  (_style.nextpage_color & 0xff000000);
   int pgw = page_en ? (pgszl.cx + pgszr.cx + _style.hilite_spacing +
@@ -196,7 +205,7 @@ void HorizontalLayout::DoLayout(CDCHandle dc, PDWR pDWR) {
   width += real_margin_x;
   height += real_margin_y;
 
-  if (!_context.preedit.str.empty() && candidates_count) {
+  if (candidates_count) {
     width = max(width, _style.min_width);
     height = max(height, _style.min_height);
   }

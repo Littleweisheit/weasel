@@ -1,17 +1,10 @@
 ﻿#pragma once
 
-// #include <string>
-// #include <vector>
+#include <string>
+#include <vector>
 #include <boost/serialization/vector.hpp>
 #include <boost/serialization/string.hpp>
 
-#define WEASEL_IME_NAME L"小狼毫"
-#define WEASEL_REG_KEY L"Software\\Rime\\Weasel"
-#define RIME_REG_KEY L"Software\\Rime"
-
-// #define USE_SHARP_COLOR_CODE
-
-// #define _DEBUG_
 namespace weasel {
 
 enum TextAttributeType { NONE = 0, HIGHLIGHTED, LAST_TYPE };
@@ -170,6 +163,12 @@ struct Status {
     full_shape = false;
     type = SCHEMA;
   }
+  bool operator==(const Status status) {
+    return (status.schema_name == schema_name &&
+            status.schema_id == schema_id && status.ascii_mode == ascii_mode &&
+            status.composing == composing && status.disabled == disabled &&
+            status.full_shape == full_shape && status.type == type);
+  }
   // 輸入方案
   std::wstring schema_name;
   // 輸入方案 id
@@ -203,7 +202,7 @@ struct UIStyle {
   };
 
   enum PreeditType { COMPOSITION, PREVIEW, PREVIEW_ALL };
-
+  enum HoverType { NONE, SEMI_HILITE, HILITE };
   enum LayoutType {
     LAYOUT_VERTICAL = 0,
     LAYOUT_HORIZONTAL,
@@ -230,7 +229,7 @@ struct UIStyle {
   bool paging_on_scroll;
   bool enhanced_position;
   bool click_to_capture;
-  int mouse_hover_ms;
+  HoverType hover_type;
   AntiAliasMode antialias_mode;
   PreeditType preedit_type;
   // custom icon settings
@@ -290,6 +289,8 @@ struct UIStyle {
   int nextpage_color;
   // per client
   int client_caps;
+  int baseline;
+  int linespacing;
 
   UIStyle()
       : font_face(),
@@ -305,7 +306,7 @@ struct UIStyle {
         paging_on_scroll(false),
         enhanced_position(false),
         click_to_capture(false),
-        mouse_hover_ms(0),
+        hover_type(NONE),
         antialias_mode(DEFAULT),
         preedit_type(COMPOSITION),
         current_zhung_icon(),
@@ -358,6 +359,8 @@ struct UIStyle {
         hilited_mark_color(0),
         prevpage_color(0),
         nextpage_color(0),
+        baseline(0),
+        linespacing(0),
         client_caps(0) {}
   bool operator!=(const UIStyle& st) {
     return (
@@ -368,7 +371,7 @@ struct UIStyle {
         paging_on_scroll != st.paging_on_scroll || font_face != st.font_face ||
         label_font_face != st.label_font_face ||
         comment_font_face != st.comment_font_face ||
-        mouse_hover_ms != st.mouse_hover_ms || font_point != st.font_point ||
+        hover_type != st.hover_type || font_point != st.font_point ||
         label_font_point != st.label_font_point ||
         comment_font_point != st.comment_font_point ||
         candidate_abbreviate_length != st.candidate_abbreviate_length ||
@@ -396,6 +399,7 @@ struct UIStyle {
         shadow_offset_x != st.shadow_offset_x ||
         shadow_offset_y != st.shadow_offset_y ||
         vertical_auto_reverse != st.vertical_auto_reverse ||
+        baseline != st.baseline || linespacing != st.linespacing ||
         text_color != st.text_color ||
         candidate_text_color != st.candidate_text_color ||
         candidate_back_color != st.candidate_back_color ||
@@ -427,7 +431,7 @@ void serialize(Archive& ar, weasel::UIStyle& s, const unsigned int version) {
   ar & s.font_face;
   ar & s.label_font_face;
   ar & s.comment_font_face;
-  ar & s.mouse_hover_ms;
+  ar & s.hover_type;
   ar & s.font_point;
   ar & s.label_font_point;
   ar & s.comment_font_point;
@@ -494,6 +498,8 @@ void serialize(Archive& ar, weasel::UIStyle& s, const unsigned int version) {
   ar & s.nextpage_color;
   // per client
   ar & s.client_caps;
+  ar & s.baseline;
+  ar & s.linespacing;
 }
 
 template <typename Archive>

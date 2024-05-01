@@ -5,14 +5,14 @@
 #include <WeaselUI.h>
 #include <RimeWithWeasel.h>
 #include <WeaselUtility.h>
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <functional>
 #include <memory>
 #include <winsparkle.h>
 
 #include "WeaselTrayIcon.h"
 
-namespace fs = boost::filesystem;
+namespace fs = std::filesystem;
 
 class WeaselServerApp {
  public:
@@ -23,9 +23,8 @@ class WeaselServerApp {
 
   static bool explore(const fs::path& path) {
     std::wstring quoted_path(L"\"" + path.wstring() + L"\"");
-    return (uintptr_t)ShellExecuteW(NULL, L"open", L"explorer",
-                                    quoted_path.c_str(), NULL,
-                                    SW_SHOWNORMAL) > 32;
+    return (uintptr_t)ShellExecuteW(NULL, L"explore", quoted_path.c_str(), NULL,
+                                    NULL, SW_SHOWNORMAL) > 32;
   }
 
   static bool open(const fs::path& path) {
