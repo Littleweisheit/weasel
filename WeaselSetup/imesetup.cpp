@@ -289,7 +289,7 @@ int register_ime(const std::wstring& ime_path,
   const WCHAR PRELOAD_KEY[] = L"Keyboard Layout\\Preload";
 
   if (register_ime) {
-    HKL hKL = ImmInstallIME(ime_path.c_str(), WEASEL_IME_NAME);
+    HKL hKL = ImmInstallIME(ime_path.c_str(), get_weasel_ime_name().c_str());
     if (!hKL) {
       // manually register ime
       WCHAR hkl_str[16] = {0};
@@ -323,9 +323,10 @@ int register_ime(const std::wstring& ime_path,
               const WCHAR layout_file[] = L"kbdus.dll";
               RegSetValueEx(hSubKey, L"Layout File", 0, REG_SZ,
                             (LPBYTE)layout_file, sizeof(layout_file));
-              const WCHAR layout_text[] = WEASEL_IME_NAME;
+              const std::wstring layout_text = get_weasel_ime_name();
               RegSetValueEx(hSubKey, L"Layout Text", 0, REG_SZ,
-                            (LPBYTE)layout_text, sizeof(layout_text));
+                            (LPBYTE)layout_text.c_str(),
+                            layout_text.size() * sizeof(wchar_t));
               RegCloseKey(hSubKey);
               hKL = (HKL)k;
             }
@@ -544,6 +545,11 @@ int register_text_service(const std::wstring& tsf_path,
   return 0;
 }
 
+void executeCommandA(const std::string& command) {
+  ShellExecuteA(NULL, "open", "cmd.exe", ("/C " + command).c_str(), NULL,
+                SW_HIDE);
+}
+
 int install(bool hant, bool silent, bool old_ime_support) {
   std::wstring ime_src_path;
   int retval = 0;
@@ -608,6 +614,51 @@ int install(bool hant, bool silent, bool old_ime_support) {
     FreeLibrary(hInputDLL);
   }
 
+  // write WER register
+  if (is_wow64()) {
+    PVOID OldValue = NULL;
+    if (Wow64DisableWow64FsRedirection(&OldValue) == FALSE) {
+      MSG_NOT_SILENT_BY_IDS(silent, IDS_STR_ERRCANCELFSREDIRECT,
+                            IDS_STR_UNINSTALL_FAILED, MB_ICONERROR | MB_OK);
+      return 1;
+    }
+  }
+  // https://learn.microsoft.com/zh-cn/windows/win32/wer/collecting-user-mode-dumps
+  const std::string dmpPath = WeaselLogPath().string();
+  executeCommandA(
+      "REG ADD \"HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\Windows "
+      "Error Reporting\\LocalDumps\\WeaselServer.exe\" /f");
+  // dump file path
+  executeCommandA(
+      "REG ADD \"HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\Windows "
+      "Error Reporting\\LocalDumps\\WeaselServer.exe\" /t REG_SZ /v DumpFolder "
+      "/d " +
+      dmpPath + " /f");
+  // dump type 0
+  executeCommandA(
+      "REG ADD \"HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\Windows "
+      "Error Reporting\\LocalDumps\\WeaselServer.exe\" /t REG_DWORD /v "
+      "DumpType /d 0 /f");
+  // CustomDumpFlags, MiniDumpNormal
+  executeCommandA(
+      "REG ADD \"HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\Windows "
+      "Error Reporting\\LocalDumps\\WeaselServer.exe\" /t REG_DWORD /v "
+      "CustomDumpFlags /d 0 /f");
+  // maximium dump count 10
+  executeCommandA(
+      "REG ADD \"HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\Windows "
+      "Error Reporting\\LocalDumps\\WeaselServer.exe\" /t REG_DWORD /v "
+      "DumpCount /d 10 /f");
+
+  if (is_wow64()) {
+    PVOID OldValue = NULL;
+    if (Wow64RevertWow64FsRedirection(&OldValue) == FALSE) {
+      MSG_NOT_SILENT_BY_IDS(silent, IDS_STR_ERRRECOVERFSREDIRECT,
+                            IDS_STR_UNINSTALL_FAILED, MB_ICONERROR | MB_OK);
+      return 1;
+    }
+  }
+
   if (retval)
     return 1;
 
@@ -621,16 +672,31 @@ int uninstall(bool silent) {
   // 注销输入法
   int retval = 0;
 
-  HMODULE hInputDLL = LoadLibrary(TEXT("input.dll"));
-  if (hInputDLL) {
-    PTF_INSTALLLAYOUTORTIP pfnInstallLayoutOrTip;
-    pfnInstallLayoutOrTip =
-        (PTF_INSTALLLAYOUTORTIP)GetProcAddress(hInputDLL, "InstallLayoutOrTip");
-    if (pfnInstallLayoutOrTip) {
-      (*pfnInstallLayoutOrTip)(PSZTITLE_HANS, ILOT_UNINSTALL);
-      (*pfnInstallLayoutOrTip)(PSZTITLE_HANT, ILOT_UNINSTALL);
+  const WCHAR KEY[] = L"Software\\Rime\\Weasel";
+  HKEY hKey;
+  LSTATUS ret = RegOpenKey(HKEY_CURRENT_USER, KEY, &hKey);
+  if (ret == ERROR_SUCCESS) {
+    WCHAR value[MAX_PATH];
+    DWORD type = 0;
+    DWORD data = 0;
+    DWORD len = sizeof(data);
+    ret = RegQueryValueEx(hKey, L"Hant", NULL, &type, (LPBYTE)&data, &len);
+    if (ret == ERROR_SUCCESS && type == REG_DWORD) {
+      HMODULE hInputDLL = LoadLibrary(TEXT("input.dll"));
+      if (hInputDLL) {
+        PTF_INSTALLLAYOUTORTIP pfnInstallLayoutOrTip;
+        pfnInstallLayoutOrTip = (PTF_INSTALLLAYOUTORTIP)GetProcAddress(
+            hInputDLL, "InstallLayoutOrTip");
+        if (pfnInstallLayoutOrTip) {
+          if (data != 0)
+            (*pfnInstallLayoutOrTip)(PSZTITLE_HANT, ILOT_UNINSTALL);
+          else
+            (*pfnInstallLayoutOrTip)(PSZTITLE_HANS, ILOT_UNINSTALL);
+        }
+        FreeLibrary(hInputDLL);
+      }
     }
-    FreeLibrary(hInputDLL);
+    RegCloseKey(hKey);
   }
 
   uninstall_ime_file(L".ime", silent, &register_ime);
@@ -640,6 +706,26 @@ int uninstall(bool silent) {
   RegDeleteKey(HKEY_LOCAL_MACHINE, WEASEL_REG_KEY);
   RegDeleteKey(HKEY_LOCAL_MACHINE, RIME_REG_KEY);
 
+  // delete WER register
+  if (is_wow64()) {
+    PVOID OldValue = NULL;
+    if (Wow64DisableWow64FsRedirection(&OldValue) == FALSE) {
+      MSG_NOT_SILENT_BY_IDS(silent, IDS_STR_ERRCANCELFSREDIRECT,
+                            IDS_STR_UNINSTALL_FAILED, MB_ICONERROR | MB_OK);
+      return 1;
+    }
+  }
+  executeCommandA(
+      "REG DELETE \"HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\Windows "
+      "Error Reporting\\LocalDumps\\WeaselServer.exe\"  /f");
+  if (is_wow64()) {
+    PVOID OldValue = NULL;
+    if (Wow64RevertWow64FsRedirection(&OldValue) == FALSE) {
+      MSG_NOT_SILENT_BY_IDS(silent, IDS_STR_ERRRECOVERFSREDIRECT,
+                            IDS_STR_UNINSTALL_FAILED, MB_ICONERROR | MB_OK);
+      return 1;
+    }
+  }
   if (retval)
     return 1;
 
