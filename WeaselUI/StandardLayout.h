@@ -8,7 +8,7 @@
 
 namespace weasel {
 const int MAX_CANDIDATES_COUNT = 100;
-const int STATUS_ICON_SIZE = GetSystemMetrics(SM_CXICON) -20;
+const int STATUS_ICON_SIZE = GetSystemMetrics(SM_CXICON) - 20;
 
 class StandardLayout : public Layout {
  public:
